@@ -1,27 +1,48 @@
-## Graph Network-based Simulator
-This repository contains a PyTorch Geometric implementation of a Graph Network-based Simulator (GNS), as popularized by DeepMind's research into particle-based physics. This model is capable of learning complex fluid dynamics (like the WaterDrop dataset) by treating particles as nodes in a dynamic graph.
-## Project Overview
-The simulator treats physical systems as graphs $\mathcal{G} = (V, E)$. It learns to predict the next state of the system by processing the spatial relationships between particles.Encoder: Embeds particle types and historical trajectories into a latent space.Processor: Uses 10 layers of Message Passing (Interaction Networks) to simulate internal forces and particle-to-particle constraints.Decoder: Predicts the acceleration of each particle, which is then integrated to update positions.
-## Features
-Adaptive Connectivity: Uses a radius_graph to dynamically update neighbors as particles move.Noise Injection: Implements a random-walk noise strategy during training to prevent "drift" during long-term rollouts.Multi-step History: Looks back at the previous 6 frames to capture velocity and acceleration trends.Boundary Handling: Includes normalized distance-to-wall features to help the model learn collision physics.
-## Installation
-Ensure you have PyTorch and PyTorch Geometric installed.Bashpip install torch torch-scatter torch-sparse torch-cluster torch-spline-conv torch-geometric
-pip install h5py tqdm numpy
-## Dataset Structure
-The model expects data in HDF5 format. Place your files in the following directory structure:
-PlaintextProcessed/
-└── WaterDrop/
-    ├── metadata.json      # Contains "bounds", "vel_mean", "acc_std", etc.
-    ├── train.h5           # Training trajectories
-    └── valid.h5           # Validation trajectories
-**Explanation of files:**
+# GNS: Graph Network-based Simulator (PyTorch Geometric)
 
-*   **`metadata.json`**: This file should contain key metadata fields such as "bounds", "vel_mean", and "acc_std".
-*   **`train.h5`**: This file contains the data for training trajectories.
-*   **`valid.h5`**: This file contains the data for validation trajectories.
-## Training & Configuration
-The training logic includes an exponential learning rate scheduler and periodic "Rollout" evaluations to check long-term stability.Parameter Value Description:hidden_size is 128, Latent dimension of MLPs and GNN layers n_mp_layers is 10, Number of message-passing steps lr $1e-4$ Initial learning rate noise $3e-4$ Noise scale for training stabilitybatch_size 4 Number of trajectory windows per batchTo start training
-## Evaluation Metrics
-One-Step MSE: Measures the error of predicting the very next frame.Rollout MSE: Measures the accumulated error over a full sequence (e.g., 100+ steps). This is the "true" test of a physical simulator.
-## Model Architecture Detail
-The core interaction is defined by the InteractionNetwork:Edge Update: $e_{i,j}' = \phi_e([v_i, v_j, e_{i,j}])$ Node Update: $v_i' = \phi_v([v_i, \sum e_{i,j}'])$ Where $\phi_e$ and $\phi_v$ are Multi-Layer Perceptrons (MLPs).
+This repository provides a PyTorch implementation of a **Graph Network-based Simulator (GNS)**, a powerful framework for learning particle-based physical simulations (e.g., fluid dynamics, sand, or cloth). This implementation is optimized for the `WaterDrop` dataset.
+
+
+
+##  Overview
+
+The simulator treats physical systems as dynamic graphs where particles are **nodes** and spatial interactions are **edges**. It utilizes an **Encode-Process-Decode** architecture:
+
+1.  **Encoder**: Constructs a graph from particle positions using a radius-based search. It embeds particle types and captures historical velocity sequences.
+2.  **Processor**: Executes 10 steps of message passing using **Interaction Networks** to propagate "forces" and constraints through the system.
+3.  **Decoder**: Transforms the processed latent features into predicted accelerations.
+
+
+
+---
+
+##  Features
+
+* **Dynamic Graph Construction**: Automatically builds edges using `radius_graph` based on a connectivity radius defined in metadata.
+* **Noise Injection**: Implements a random-walk noise strategy during training to improve the stability of long-term rollouts.
+* **Boundary Awareness**: Incorporates normalized distance-to-boundary features, allowing the model to learn collision physics.
+* **Accumulated History**: Utilizes a window of previous frames (default: 6) to provide the model with momentum and acceleration context.
+
+---
+
+## Installation
+
+This project requires **PyTorch** and **PyTorch Geometric**. Ensure you have a compatible CUDA version installed.
+
+```bash
+# Install core dependencies
+pip install torch torch-scatter torch-sparse torch-cluster torch-geometric
+pip install h5py tqdm numpy
+
+Processed/
+└── WaterDrop/
+    ├── metadata.json      # Simulation constants (radius, bounds, normalization stats)
+    ├── train.h5           # Training trajectory data
+    └── valid.h5           # Validation trajectory data
+
+Parameter,Default,Description
+hidden_size,128,Latent dimension of MLPs and GNN layers
+n_mp_layers,10,Number of message-passing steps (Processor depth)
+lr,1e-4,Learning rate with exponential decay
+noise,3e-4,Standard deviation of training noise
+window_size,5,Number of historical frames provided to the model
